@@ -156,7 +156,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MAX_SPEED: 7
   MAX_FORCE: 7
-  MAX_HP: 10
+  MAX_HP: 100
+  FleeTime: 5
   fatalColor: {r: 1, g: 0.3529412, b: 0.3529412, a: 1}
   hp: 0
 --- !u!60 &24820794
@@ -368,6 +369,7 @@ GameObject:
   - component: {fileID: 717540836}
   - component: {fileID: 717540835}
   - component: {fileID: 717540837}
+  - component: {fileID: 717540838}
   m_Layer: 0
   m_Name: Food
   m_TagString: Untagged
@@ -445,6 +447,19 @@ CircleCollider2D:
   m_Offset: {x: 0, y: 0}
   serializedVersion: 2
   m_Radius: 0.5
+--- !u!114 &717540838
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 717540834}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa8a53a1fe2ae1d43a3bc353a3cef9a9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  MAX_HP: 10000000
+  endColor: {r: 0.9374448, g: 0.4957829, b: 0.9632353, a: 0}
 --- !u!1 &892481893
 GameObject:
   m_ObjectHideFlags: 0
@@ -837,7 +852,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MAX_SPEED: 7
   MAX_FORCE: 7
-  MAX_HP: 10
+  MAX_HP: 100
+  FleeTime: 5
   fatalColor: {r: 1, g: 0.3529412, b: 0.3529412, a: 1}
   hp: 0
 --- !u!58 &1696661137

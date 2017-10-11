@@ -7,9 +7,10 @@ public class AnimalController : MonoBehaviour {
     public float MAX_SPEED = 10;
     public float MAX_FORCE = 7;
     public float MAX_HP = 10;
+    public float FleeTime = 5;
     public Color fatalColor;
 
-    public enum MovemetMode
+    public enum ActionMode
     {
         Wander = 0,
         Seek,
@@ -17,17 +18,25 @@ public class AnimalController : MonoBehaviour {
         Flee
     }
 
+    enum HealthCondition
+    {
+        Healthy = 0,
+        Fatal
+    }
+
     Rigidbody2D rgb;
     SpriteRenderer sprite;
     Color startColor;
     Vector2 acceleration = Vector2.zero;
     Vector2 velocity = Vector2.zero;
-    MovemetMode moveMode = MovemetMode.Wander;
-    Vector2 seekTarget = Vector2.zero;
+    ActionMode actionMode = ActionMode.Wander;
+    GameObject seekTarget = null;
     GameObject attackTarget = null;
     public float hp;
+    float fleeStartTime = 0;
+    HealthCondition healthCond = HealthCondition.Healthy;
 
-    public MovemetMode CurrentMoveMode { get { return moveMode; } }
+    public ActionMode CurrentActionMode { get { return actionMode; } }
     
 	// Use this for initialization
 	void Start () {
@@ -39,21 +48,32 @@ public class AnimalController : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-        switch(moveMode)
+        SelectActionMode();
+
+        switch (actionMode)
         {
-            case MovemetMode.Wander:
+            case ActionMode.Wander:
                 Wander();
                 break;
 
-            case MovemetMode.Seek:
-                Arrival(seekTarget);
+            case ActionMode.Seek:
+                if (seekTarget)
+                    Arrival(seekTarget.transform.position);
                 break;
 
-            case MovemetMode.Attack:
-                if (CheckForFight())
+            case ActionMode.Attack:
+                //if (CheckForFight())
+                //    Arrival(attackTarget.transform.position);
+                //else
+                //    moveMode = MovemetMode.Seek;
+                if (attackTarget)
                     Arrival(attackTarget.transform.position);
-                else
-                    moveMode = MovemetMode.Seek;
+                break;
+
+            case ActionMode.Flee:
+                //if (seekTarget)
+                //    Flee(seekTarget.transform.position);
+                Flee();
                 break;
 
             default:
@@ -63,6 +83,44 @@ public class AnimalController : MonoBehaviour {
         transform.up = rgb.velocity.normalized;
 
         sprite.color = Color.Lerp(fatalColor, startColor, hp / MAX_HP);
+    }
+
+    void SelectActionMode()
+    {
+        if (healthCond == HealthCondition.Fatal)
+        {
+            if (seekTarget && attackTarget)
+            {
+                if (actionMode == ActionMode.Flee)
+                    return;
+
+                Vector2 awayVec = (transform.position - seekTarget.transform.position);
+                transform.up = awayVec.normalized;
+
+                actionMode = ActionMode.Flee;
+                return;
+            }
+        }
+
+        if (attackTarget)
+        {
+            if (attackTarget.GetComponent<AnimalController>().CurrentActionMode != ActionMode.Flee)
+            {
+                actionMode = ActionMode.Attack;
+                return;
+            }
+        }
+
+        if (seekTarget && attackTarget == null)
+        {
+            actionMode = ActionMode.Seek;
+            return;
+        }
+        
+        if (seekTarget == null && attackTarget == null)
+        {
+            actionMode = ActionMode.Wander;
+        }
     }
 
     void Wander()
@@ -107,28 +165,67 @@ public class AnimalController : MonoBehaviour {
         rgb.velocity = velocity;
     }
 
-    bool CheckForFight()
+    void Flee()
     {
-        if (attackTarget == null)
-            return false;
+        Vector2 desired_velocity = transform.up * MAX_SPEED;
 
-        AnimalController targetController = attackTarget.GetComponent<AnimalController>();
+        Vector2 steering_force = desired_velocity - velocity;
 
-        if (targetController.CurrentMoveMode == MovemetMode.Flee)
-            return false;
+        if (steering_force.magnitude > MAX_FORCE)
+            steering_force = steering_force.normalized * MAX_FORCE;
 
-        return true;
+        acceleration = steering_force / rgb.mass;
+
+        velocity += acceleration;
+
+        if (velocity.magnitude > MAX_SPEED)
+            velocity = velocity.normalized * MAX_SPEED;
+
+        rgb.velocity = velocity;
     }
 
-    void TakeDamage(float val)
+    //bool CheckForFight()
+    //{
+    //    if (attackTarget == null)
+    //        return false;
+
+    //    AnimalController targetController = attackTarget.GetComponent<AnimalController>();
+
+    //    if (targetController.CurrentActionMode == ActionMode.Flee)
+    //        return false;
+
+    //    return true;
+    //}
+
+    void TakeDamage(AnimalController enemy)
     {
+        attackTarget = enemy.gameObject;
+        float val = Random.Range(1, 3);
         hp -= val;
+
+        if (hp < 0.2f * MAX_HP)
+        {
+            healthCond = HealthCondition.Fatal;
+        }
 
         if (hp < 0)
         {
             hp = 0;
             Destroy(gameObject);
         }
+    }
+
+    void EatFood(float val)
+    {
+        hp += val;
+
+        if (hp > 0.7f * MAX_HP)
+        {
+            healthCond = HealthCondition.Healthy;
+        }
+
+        if (hp > MAX_HP)
+            hp = MAX_HP;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -150,47 +247,78 @@ public class AnimalController : MonoBehaviour {
             transform.up = -collisionVector.normalized;
         }
 
-        if (collision.gameObject.name.ToLower().Contains("animal") && moveMode != MovemetMode.Wander)
+        if (collision.gameObject.name.ToLower().Contains("animal") && attackTarget != null)
         {
-            //if (moveMode != MovemetMode.Attack)
-            //{
-            //    attackTarget = collision.gameObject;
-            //    moveMode = MovemetMode.Attack;
-            //}
-
-            TakeDamage(Random.Range(0.5f, 1.5f));
+            if (collision.gameObject == attackTarget && actionMode == ActionMode.Attack)
+            {
+                attackTarget.GetComponent<AnimalController>().TakeDamage(this);
+            }
         }
 
-        if (collision.gameObject.name.ToLower().Contains("animal") && moveMode != MovemetMode.Wander)
+        if (collision.gameObject.name.ToLower().Contains("food") && seekTarget != null)
         {
-            TakeDamage(Random.Range(0.5f, 1.5f));
+            EatFood(collision.gameObject.GetComponent<Food>().TrasferHPToAnimal());
         }
     }
 
     private void OnTriggerEnter2D(Collider2D collider)
     {
-        if (collider.gameObject.name.ToLower().Contains("food") && moveMode != MovemetMode.Seek && attackTarget == null)
+        if (collider.gameObject.name.ToLower().Contains("food") && seekTarget == null)
         {
-            seekTarget = collider.transform.position;
-            moveMode = MovemetMode.Seek;
+            seekTarget = collider.gameObject;
         }
 
-        if (collider.gameObject.name.ToLower().Contains("animal") && moveMode != MovemetMode.Wander)
+        if (collider.gameObject.name.ToLower().Contains("animal") && seekTarget != null)
         {
             if (!collider.isTrigger)
             {
-                attackTarget = collider.gameObject;
-                moveMode = MovemetMode.Attack;
+                Vector2 distanceVec = transform.position - collider.gameObject.transform.position;
+
+                if (hp <= 0.2f * MAX_HP)
+                    attackTarget = collider.gameObject;
+                else if (distanceVec.magnitude < 2)
+                    attackTarget = collider.gameObject;
+            }
+        }
+    }
+
+    private void OnTriggerStay2D(Collider2D collider)
+    {
+        if (collider.gameObject.name.ToLower().Contains("food") && seekTarget == null)
+        {
+            seekTarget = collider.gameObject;
+        }
+
+        if (collider.gameObject.name.ToLower().Contains("animal") && seekTarget != null)
+        {
+            if (!collider.isTrigger)
+            {
+                Vector2 distanceVec = transform.position - collider.gameObject.transform.position;
+
+                if (distanceVec.magnitude < 2)
+                    attackTarget = collider.gameObject;
             }
         }
     }
 
     private void OnTriggerExit2D(Collider2D collider)
     {
-        if (collider.gameObject.name.ToLower().Contains("food") && moveMode == MovemetMode.Seek && attackTarget == null)
+        if (collider.gameObject.name.ToLower().Contains("food"))
         {
-            seekTarget = Vector2.zero;
-            moveMode = MovemetMode.Wander;
+            if (collider.gameObject == seekTarget)
+            {
+                seekTarget = null;
+                if (attackTarget)
+                    attackTarget = null;
+            }
+        }
+
+        if (collider.gameObject.name.ToLower().Contains("animal"))
+        {
+            if (collider.gameObject == attackTarget && !collider.isTrigger)
+            {
+                attackTarget = null;
+            }
         }
     }
 }
