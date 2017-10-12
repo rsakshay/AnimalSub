@@ -21,7 +21,7 @@ public class Food : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-        Color.Lerp(endColor, startColor, hp / MAX_HP);
+        sprite.color = Color.Lerp(endColor, startColor, hp / MAX_HP);
 	}
 
     public float TrasferHPToAnimal()
